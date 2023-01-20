@@ -122,32 +122,3 @@ class Powerset(nn.Module):
             torch.argmax(torch.matmul(multilabel, self.mapping.T), dim=-1),
             num_classes=self.num_powerset_classes,
         )
-
-
-if __name__ == "__main__":
-
-    powerset = Powerset(3, 3)
-    print(powerset.mapping)
-
-    # simulate a sequence where each frame is assigned to a different powerset class
-    one_sequence = [
-        [0] * powerset.num_powerset_classes
-        for _ in range(powerset.num_powerset_classes)
-    ]
-    for i in range(powerset.num_powerset_classes):
-        one_sequence[i][i] = 1.0
-
-    # make a batch out of this sequence and the same sequence in reverse order
-    batch_powerset = torch.tensor([one_sequence, one_sequence[::-1]])
-    print(batch_powerset)
-    print(batch_powerset.shape)
-
-    # convert from powerset to multi-label
-    batch_multilabel = powerset.to_multilabel(batch_powerset)
-    print(batch_multilabel)
-    print(batch_multilabel.shape)
-
-    # convert batch to powerset
-    reconstruction = powerset.to_powerset(batch_multilabel)
-    print(reconstruction)
-    print(reconstruction.shape)
