@@ -79,6 +79,9 @@ class SupervisedRepresentationLearningTaskMixin:
         # loop over the training set, remove annotated regions shorter than
         # chunk duration, and keep track of the reference annotations, per class.
 
+        # FIXME: it looks like this time consuming step is called multiple times.
+        # it should not be...
+
         self._train = dict()
 
         desc = f"Loading {self.protocol.name} training labels"
@@ -218,28 +221,19 @@ class SupervisedRepresentationLearningTaskMixin:
         avg_chunk_duration = 0.5 * (self.min_duration + self.duration)
         return max(self.batch_size, math.ceil(duration / avg_chunk_duration))
 
-    def collate_X(self, batch) -> torch.Tensor:
-        return default_collate([b["X"] for b in batch])
-
-    def collate_y(self, batch) -> torch.Tensor:
-        return default_collate([b["y"] for b in batch])
-
     def collate_fn(self, batch, stage="train"):
 
-        # collate X
-        collated_X = self.collate_X(batch)
+        collated = default_collate(batch)
 
-        # collate y
-        collated_y = self.collate_y(batch)
+        if stage == "train":
+            self.augmentation.train(mode=True)
+            augmented = self.augmentation(
+                samples=collated["X"],
+                sample_rate=self.model.hparams.sample_rate,
+            )
+            collated["X"] = augmented.samples
 
-        # apply augmentation (only in "train" stage)
-        self.augmentation.train(mode=(stage == "train"))
-        augmented = self.augmentation(
-            samples=collated_X,
-            sample_rate=self.model.hparams.sample_rate,
-        )
-
-        return {"X": augmented.samples, "y": collated_y}
+        return collated
 
     def training_step(self, batch, batch_idx: int):
 
@@ -257,6 +251,7 @@ class SupervisedRepresentationLearningTaskMixin:
         return {"loss": loss}
 
     def val__getitem__(self, idx):
+
         if isinstance(self.protocol, SpeakerVerificationProtocol):
             trial = self._validation[idx]
 
@@ -312,6 +307,3 @@ class SupervisedRepresentationLearningTaskMixin:
                 prog_bar=True,
                 logger=True,
             )
-
-        elif isinstance(self.protocol, SpeakerDiarizationProtocol):
-            pass
