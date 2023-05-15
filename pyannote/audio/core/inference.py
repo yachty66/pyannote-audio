@@ -93,7 +93,6 @@ class Inference(BaseInference):
         batch_size: int = 32,
         use_auth_token: Union[Text, None] = None,
     ):
-
         self.model = (
             model
             if isinstance(model, Model)
@@ -240,7 +239,7 @@ class Inference(BaseInference):
             and (num_frames, dimension) for frame-level tasks.
         """
 
-        window_size: int = round(self.duration * sample_rate)
+        window_size: int = self.model.audio.get_num_samples(self.duration)
         step_size: int = round(self.step * sample_rate)
         _, num_samples = waveform.shape
 
@@ -284,7 +283,6 @@ class Inference(BaseInference):
 
         # process orphan last chunk
         if has_last_chunk:
-
             last_output = self.infer(last_chunk[None])
 
             if specifications.resolution == Resolution.FRAME:
@@ -409,7 +407,6 @@ class Inference(BaseInference):
         """
 
         if self.window == "sliding":
-
             if not isinstance(chunk, Segment):
                 start = min(c.start for c in chunk)
                 end = max(c.end for c in chunk)
@@ -427,7 +424,6 @@ class Inference(BaseInference):
             return SlidingWindowFeature(output.data, shifted_frames)
 
         elif self.window == "whole":
-
             if isinstance(chunk, Segment):
                 waveform, sample_rate = self.model.audio.crop(
                     file, chunk, duration=duration
@@ -685,7 +681,6 @@ class Inference(BaseInference):
 
         stitches = []
         for C, (chunk, activation) in enumerate(activations):
-
             local_stitch = np.NAN * np.zeros(
                 (sum(lookahead) + 1, num_frames, num_classes)
             )
@@ -693,7 +688,6 @@ class Inference(BaseInference):
             for c in range(
                 max(0, C - lookahead[0]), min(num_chunks, C + lookahead[1] + 1)
             ):
-
                 # extract common temporal support
                 shift = round((C - c) * num_frames * chunks.step / chunks.duration)
 
@@ -714,7 +708,6 @@ class Inference(BaseInference):
                 )
 
                 for this, that in enumerate(permutation):
-
                     # only stitch under certain condiditions
                     matching = (c == C) or (
                         match_func(
