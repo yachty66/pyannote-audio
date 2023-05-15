@@ -27,6 +27,7 @@ from typing import Callable, List, Optional, Text, Tuple, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from einops import rearrange
 from pyannote.core import Segment, SlidingWindow, SlidingWindowFeature
 from pytorch_lightning.utilities.memory import is_oom_error
@@ -246,11 +247,12 @@ class Inference(BaseInference):
         specifications = self.model.specifications
         resolution = specifications.resolution
         introspection = self.model.introspection
+
         if resolution == Resolution.CHUNK:
             frames = SlidingWindow(start=0.0, duration=self.duration, step=self.step)
+
         elif resolution == Resolution.FRAME:
             frames = introspection.frames
-            num_frames_per_chunk, dimension = introspection(window_size)
 
         # prepare complete chunks
         if num_samples >= window_size:
@@ -267,7 +269,11 @@ class Inference(BaseInference):
             num_samples - window_size
         ) % step_size > 0
         if has_last_chunk:
+            # pad last chunk with zeros
             last_chunk: torch.Tensor = waveform[:, num_chunks * step_size :]
+            _, last_window_size = last_chunk.shape
+            last_pad = window_size - last_window_size
+            last_chunk = F.pad(last_chunk, (0, last_pad))
 
         outputs: Union[List[np.ndarray], np.ndarray] = list()
 
@@ -284,11 +290,6 @@ class Inference(BaseInference):
         # process orphan last chunk
         if has_last_chunk:
             last_output = self.infer(last_chunk[None])
-
-            if specifications.resolution == Resolution.FRAME:
-                pad = num_frames_per_chunk - last_output.shape[1]
-                last_output = np.pad(last_output, ((0, 0), (0, pad), (0, 0)))
-
             outputs.append(last_output)
             if hook is not None:
                 hook(
@@ -326,9 +327,11 @@ class Inference(BaseInference):
             missing=0.0,
         )
 
+        # remove padding that was added to last chunk
         if has_last_chunk:
-            num_frames = aggregated.data.shape[0]
-            aggregated.data = aggregated.data[: num_frames - pad, :]
+            aggregated.data = aggregated.crop(
+                Segment(0.0, num_samples / sample_rate), mode="loose"
+            )
 
         return aggregated
 
