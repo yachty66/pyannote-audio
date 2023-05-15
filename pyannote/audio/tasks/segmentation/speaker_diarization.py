@@ -143,7 +143,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         max_num_speakers: int = None,  # deprecated in favor of `max_speakers_per_chunk``
         loss: Literal["bce", "mse"] = None,  # deprecated
     ):
-
         super().__init__(
             protocol,
             duration=duration,
@@ -188,12 +187,10 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         self.vad_loss = vad_loss
 
     def setup(self, stage: Optional[str] = None):
-
         super().setup(stage=stage)
 
         # estimate maximum number of speakers per chunk when not provided
         if self.max_speakers_per_chunk is None:
-
             training = self.metadata["subset"] == Subsets.index("train")
 
             num_unique_speakers = []
@@ -201,7 +198,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             for file_id in track(
                 np.where(training)[0], description=progress_description
             ):
-
                 annotations = self.annotations[
                     np.where(self.annotations["file_id"] == file_id)[0]
                 ]
@@ -280,6 +276,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             else Problem.MONO_LABEL_CLASSIFICATION,
             resolution=Resolution.FRAME,
             duration=self.duration,
+            min_duration=self.min_duration,
             warm_up=self.warm_up,
             classes=[f"speaker#{i+1}" for i in range(self.max_speakers_per_chunk)],
             powerset_max_classes=self.max_speakers_per_frame,
@@ -448,7 +445,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         """
 
         if self.specifications.powerset:
-
             # `clamp_min` is needed to set non-speech weight to 1.
             class_weight = (
                 torch.clamp_min(self.model.powerset.cardinality, 1.0)
@@ -569,7 +565,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         weight[:, num_frames - warm_up_right :] = 0.0
 
         if self.specifications.powerset:
-
             powerset = torch.nn.functional.one_hot(
                 torch.argmax(prediction, dim=-1),
                 self.model.powerset.num_powerset_classes,
@@ -602,7 +597,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             vad_loss = 0.0
 
         else:
-
             # TODO: vad_loss probably does not make sense in powerset mode
             # because first class (empty set of labels) does exactly this...
             if self.specifications.powerset:
@@ -704,7 +698,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         weight[:, num_frames - warm_up_right :] = 0.0
 
         if self.specifications.powerset:
-
             powerset = torch.nn.functional.one_hot(
                 torch.argmax(prediction, dim=-1),
                 self.model.powerset.num_powerset_classes,
@@ -740,7 +733,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             vad_loss = 0.0
 
         else:
-
             # TODO: vad_loss probably does not make sense in powerset mode
             # because first class (empty set of labels) does exactly this...
             if self.specifications.powerset:
@@ -833,7 +825,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
 
         # plot each sample
         for sample_idx in range(num_samples):
-
             # find where in the grid it should be plotted
             row_idx = sample_idx // nrows
             col_idx = sample_idx % ncols
@@ -893,7 +884,6 @@ def main(protocol: str, subset: str = "test", model: str = "pyannote/segmentatio
     files = list(getattr(protocol, subset)())
 
     with Progress() as progress:
-
         main_task = progress.add_task(protocol.name, total=len(files))
         file_task = progress.add_task("Processing", total=1.0)
 

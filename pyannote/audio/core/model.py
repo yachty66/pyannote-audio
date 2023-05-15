@@ -65,13 +65,17 @@ class Introspection:
     Parameters
     ----------
     min_num_samples: int
-        Minimum number of input samples
+        For fixed-duration models, expected number of input samples.
+        For variable-duration models, minimum number of input samples supported by
+        the model (i.e. model fails for smaller number of samples).
     min_num_frames: int
-        Corresponding minimum number of output frames
+        Corresponding number of output frames.
     inc_num_samples: int
-        Number of input samples leading to an increase of number of output frames
+        Number of input samples leading to an increase of number of output frames.
+        Has no meaning for fixed-duration models (set to 0).
     inc_num_frames: int
         Corresponding increase in number of output frames
+        Has no meaning for fixed-duration models (set to 0).
     dimension: int
         Output dimension
     sample_rate: int
@@ -103,12 +107,46 @@ class Introspection:
         self.sample_rate = sample_rate
 
     @classmethod
-    def from_model(cls, model: "Model", task: str = None) -> Introspection:
+    def from_model(cls, model: "Model") -> Introspection:
+        """
+
+        Parameters
+        ----------
+        model : Model
+        """
 
         specifications = model.specifications
-        if task is not None:
-            specifications = specifications[task]
+        duration = specifications.duration
+        min_duration = specifications.min_duration or duration
 
+        # case 1: the model expects a fixed-duration chunk
+        if min_duration == duration:
+            num_samples = model.audio.get_num_samples(specifications.duration)
+            frames = model(model.example_input_array)
+            if specifications.resolution == Resolution.FRAME:
+                _, num_frames, dimension = frames.shape
+                return cls(
+                    min_num_samples=num_samples,
+                    min_num_frames=num_frames,
+                    inc_num_samples=0,
+                    inc_num_frames=0,
+                    dimension=dimension,
+                    sample_rate=model.hparams.sample_rate,
+                )
+
+            elif specifications.resolution == Resolution.CHUNK:
+                _, dimension = frames.shape
+                return cls(
+                    min_num_samples=num_samples,
+                    min_num_frames=1,
+                    inc_num_samples=0,
+                    inc_num_frames=0,
+                    dimension=dimension,
+                    sample_rate=model.hparams.sample_rate,
+                )
+
+        # case 2: the model supports variable-duration chunks
+        # we use dichotomic search to find the minimum number of samples
         example_input_array = model.example_input_array
         batch_size, num_channels, num_samples = example_input_array.shape
         example_input_array = torch.randn(
@@ -126,8 +164,6 @@ class Introspection:
             try:
                 with torch.no_grad():
                     frames = model(example_input_array[:, :, :num_samples])
-                if task is not None:
-                    frames = frames[task]
             except Exception:
                 lower = num_samples
             else:
@@ -175,8 +211,6 @@ class Introspection:
             )
             with torch.no_grad():
                 frames = model(example_input_array)
-            if task is not None:
-                frames = frames[task]
             num_frames = frames.shape[1]
             if num_frames > min_num_frames:
                 break
@@ -194,8 +228,6 @@ class Introspection:
             )
             with torch.no_grad():
                 frames = model(example_input_array)
-            if task is not None:
-                frames = frames[task]
             num_frames = frames.shape[1]
             if num_frames > min_num_frames:
                 inc_num_frames = num_frames - min_num_frames
@@ -232,6 +264,13 @@ class Introspection:
             Dimension of output frames
         """
 
+        # case 1: the model expects a fixed-duration chunk
+        if self.inc_num_frames == 0:
+            assert num_samples == self.min_num_samples
+            return self.min_num_frames, self.dimension
+
+        # case 2: the model supports variable-duration chunks
+
         if num_samples < self.min_num_samples:
             return 0, self.dimension
 
@@ -246,7 +285,14 @@ class Introspection:
     def frames(self) -> SlidingWindow:
         # HACK to support model trained before 'sample_rate' was an Introspection attribute
         sample_rate = getattr(self, "sample_rate", 16000)
-        step = (self.inc_num_samples / self.inc_num_frames) / sample_rate
+
+        if self.inc_num_frames == 0:
+            step = (self.min_num_samples / self.min_num_frames) / sample_rate
+        else:
+            # FIXME: this is not 100% accurate, but it's good enough for now
+            # FIXME: it should probably be estimated from the maximum duration
+            step = (self.inc_num_samples / self.inc_num_frames) / sample_rate
+
         return SlidingWindow(start=0.0, step=step, duration=step)
 
 
@@ -368,7 +414,6 @@ class Model(pl.LightningModule):
             del self._introspection
 
     def setup(self, stage=None):
-
         if stage == "fit":
             self.task.setup()
 
@@ -421,7 +466,6 @@ class Model(pl.LightningModule):
         self.task_dependent = list(name for name, _ in after - before)
 
     def on_save_checkpoint(self, checkpoint):
-
         # put everything pyannote.audio-specific under pyannote.audio
         # to avoid any future conflicts with pytorch-lightning updates
         checkpoint["pyannote.audio"] = {
@@ -438,7 +482,6 @@ class Model(pl.LightningModule):
         }
 
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]):
-
         check_version(
             "pyannote.audio",
             checkpoint["pyannote.audio"]["versions"]["pyannote.audio"],
@@ -636,7 +679,6 @@ class Model(pl.LightningModule):
             modules = [modules]
 
         for name, module in ModelSummary(self, max_depth=-1).named_modules:
-
             if name not in modules:
                 continue
 
@@ -826,7 +868,6 @@ visit https://hf.co/{model_id} to accept the user conditions."""
             # HACK do not use it. Fails silently in case model does not
             # HACK have a config.yaml file.
             try:
-
                 _ = hf_hub_download(
                     model_id,
                     HF_LIGHTNING_CONFIG_NAME,

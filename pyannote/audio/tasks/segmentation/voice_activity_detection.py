@@ -89,7 +89,6 @@ class VoiceActivityDetection(SegmentationTaskMixin, Task):
         augmentation: BaseWaveformTransform = None,
         metric: Union[Metric, Sequence[Metric], Dict[str, Metric]] = None,
     ):
-
         super().__init__(
             protocol,
             duration=duration,
@@ -108,6 +107,7 @@ class VoiceActivityDetection(SegmentationTaskMixin, Task):
             problem=Problem.BINARY_CLASSIFICATION,
             resolution=Resolution.FRAME,
             duration=self.duration,
+            min_duration=self.min_duration,
             warm_up=self.warm_up,
             classes=[
                 "speech",

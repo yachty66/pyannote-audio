@@ -72,9 +72,11 @@ class Specifications:
     problem: Problem
     resolution: Resolution
 
-    # chunk duration in seconds.
-    # use None for variable-length chunks
-    duration: Optional[float] = None
+    # (maximum) chunk duration in seconds
+    duration: float
+
+    # (for variable-duration tasks only) minimum chunk duration in seconds
+    min_duration: Optional[float] = None
 
     # use that many seconds on the left- and rightmost parts of each chunk
     # to warm up the model. This is mostly useful for segmentation tasks.
@@ -96,7 +98,6 @@ class Specifications:
 
     @cached_property
     def powerset(self):
-
         if self.powerset_max_classes is None:
             return False
 
@@ -302,7 +303,6 @@ class Task(pl.LightningDataModule):
 
     @cached_property
     def logging_prefix(self):
-
         prefix = f"{self.__class__.__name__}-"
         if hasattr(self.protocol, "name"):
             # "." has a special meaning for pytorch-lightning checkpointing
