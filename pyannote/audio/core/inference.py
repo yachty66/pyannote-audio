@@ -256,7 +256,7 @@ class Inference(BaseInference):
         step_size: int = round(self.step * sample_rate)
         _, num_samples = waveform.shape
 
-        frames = self.model.output_frames
+        frames = self.model.example_output.frames
 
         def __frames(
             frames, specifications: Optional[Specifications] = None
@@ -268,7 +268,7 @@ class Inference(BaseInference):
         frames: Union[SlidingWindow, Tuple[SlidingWindow]] = map_with_specifications(
             self.model.specifications,
             __frames,
-            self.model.output_frames,
+            self.model.example_output.frames,
         )
 
         # prepare complete chunks

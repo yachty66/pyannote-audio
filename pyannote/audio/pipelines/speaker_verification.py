@@ -419,7 +419,7 @@ class PyannoteAudioPretrainedSpeakerEmbedding(BaseInference):
 
     @cached_property
     def dimension(self) -> int:
-        return self.model_.output_dimension
+        return self.model_.example_output.dimension
 
     @cached_property
     def metric(self) -> str:

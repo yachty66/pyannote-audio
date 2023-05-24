@@ -178,19 +178,23 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
 
         # discretize chunk annotations at model output resolution
         start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
-        start_idx = np.floor(start / self.frames.step).astype(int)
+        start_idx = np.floor(start / self.model.example_output.frames.step).astype(int)
         end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
-        end_idx = np.ceil(end / self.frames.step).astype(int)
+        end_idx = np.ceil(end / self.model.example_output.frames.step).astype(int)
 
         # frame-level targets (-1 for un-annotated classes)
-        y = -np.ones((self.num_frames_per_chunk, len(self.classes)), dtype=np.int8)
+        y = -np.ones(
+            (self.model.example_output.num_frames, len(self.classes)), dtype=np.int8
+        )
         y[:, self.annotated_classes[file_id]] = 0
         for start, end, label in zip(
             start_idx, end_idx, chunk_annotations["global_label_idx"]
         ):
             y[start:end, label] = 1
 
-        sample["y"] = SlidingWindowFeature(y, self.frames, labels=self.classes)
+        sample["y"] = SlidingWindowFeature(
+            y, self.model.example_output.frames, labels=self.classes
+        )
 
         metadata = self.metadata[file_id]
         sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}

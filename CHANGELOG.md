@@ -20,8 +20,8 @@
   - BREAKING(model): get rid of (flaky) `Model.introspection`
     If, for some weird reason, you wrote some custom code based on that, you should instead rely on:
     * `Model.example_output(duration=...)` to get example output(s)
-    * `Model.output_frames` to get output frame resolution(s)
-    * `Model.output_dimension` to get output dimension(s)
+    * `Model.example_output.frames` to get output frame resolution(s)
+    * `Model.example_output.dimension` to get output dimension(s)
 
 
 ### Features and improvements

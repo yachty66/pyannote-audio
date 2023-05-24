@@ -154,16 +154,18 @@ class VoiceActivityDetection(SegmentationTaskMixin, Task):
 
         # discretize chunk annotations at model output resolution
         start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
-        start_idx = np.floor(start / self.frames.step).astype(int)
+        start_idx = np.floor(start / self.model.example_output.frames.step).astype(int)
         end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
-        end_idx = np.ceil(end / self.frames.step).astype(int)
+        end_idx = np.ceil(end / self.model.example_output.frames.step).astype(int)
 
         # frame-level targets
-        y = np.zeros((self.num_frames_per_chunk, 1), dtype=np.uint8)
+        y = np.zeros((self.model.example_output.num_frames, 1), dtype=np.uint8)
         for start, end in zip(start_idx, end_idx):
             y[start:end, 0] = 1
 
-        sample["y"] = SlidingWindowFeature(y, self.frames, labels=["speech"])
+        sample["y"] = SlidingWindowFeature(
+            y, self.model.example_output.frames, labels=["speech"]
+        )
 
         metadata = self.metadata[file_id]
         sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}

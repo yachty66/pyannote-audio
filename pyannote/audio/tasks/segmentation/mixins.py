@@ -25,13 +25,11 @@ import math
 import random
 import warnings
 from collections import defaultdict
-from functools import cached_property
 from typing import Dict, Sequence, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from pyannote.core import SlidingWindow
 from pyannote.database.protocol import SegmentationProtocol, SpeakerDiarizationProtocol
 from pyannote.database.protocol.protocol import Scope, Subset
 from pytorch_lightning.loggers import MLFlowLogger, TensorBoardLogger
@@ -385,15 +383,6 @@ class SegmentationTaskMixin:
 
         dtype = [("file_id", "i"), ("start", "f"), ("duration", "f")]
         self.validation_chunks = np.array(validation_chunks, dtype=dtype)
-
-    @cached_property
-    def frames(self) -> SlidingWindow:
-        return self.model.output_frames
-
-    @cached_property
-    def num_frames_per_chunk(self) -> int:
-        batch_size, num_frames, num_classes = self.model.example_output().shape
-        return num_frames
 
     def default_metric(
         self,

@@ -337,9 +337,9 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
 
         # discretize chunk annotations at model output resolution
         start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
-        start_idx = np.floor(start / self.frames.step).astype(int)
+        start_idx = np.floor(start / self.model.example_output.frames.step).astype(int)
         end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
-        end_idx = np.ceil(end / self.frames.step).astype(int)
+        end_idx = np.ceil(end / self.model.example_output.frames.step).astype(int)
 
         # get list and number of labels for current scope
         labels = list(np.unique(chunk_annotations[label_scope_key]))
@@ -349,7 +349,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             pass
 
         # initial frame-level targets
-        y = np.zeros((self.num_frames_per_chunk, num_labels), dtype=np.uint8)
+        y = np.zeros((self.model.example_output.num_frames, num_labels), dtype=np.uint8)
 
         # map labels to indices
         mapping = {label: idx for idx, label in enumerate(labels)}
@@ -360,7 +360,9 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             mapped_label = mapping[label]
             y[start:end, mapped_label] = 1
 
-        sample["y"] = SlidingWindowFeature(y, self.frames, labels=labels)
+        sample["y"] = SlidingWindowFeature(
+            y, self.model.example_output.frames, labels=labels
+        )
 
         metadata = self.metadata[file_id]
         sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}

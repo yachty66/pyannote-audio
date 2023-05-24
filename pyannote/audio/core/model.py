@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import os
 import warnings
+from dataclasses import dataclass
+from functools import cached_property
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
@@ -65,6 +67,13 @@ class Introspection:
     pass
 
 
+@dataclass
+class Output:
+    num_frames: int
+    dimension: int
+    frames: SlidingWindow
+
+
 class Model(pl.LightningModule):
     """Base model
 
@@ -101,7 +110,12 @@ class Model(pl.LightningModule):
 
     @task.setter
     def task(self, task: Task):
+        # reset (cached) properties when task changes
         del self.specifications
+        try:
+            del self.example_output
+        except AttributeError:
+            pass
         self._task = task
 
     def build(self):
@@ -173,54 +187,33 @@ class Model(pl.LightningModule):
     def example_input_array(self) -> torch.Tensor:
         return self.__example_input_array()
 
-    def example_output(
-        self, duration: Optional[float] = None
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor]]:
+    @cached_property
+    def example_output(self) -> Union[Output, Tuple[Output]]:
         """Example output"""
-        example_input_array = self.__example_input_array(duration=duration)
+        example_input_array = self.__example_input_array()
         with torch.inference_mode():
             example_output = self(example_input_array)
 
-        if not isinstance(example_output, (torch.Tensor, tuple)):
-            raise ValueError(
-                "Models must return either a torch.Tensor or a tuple of torch.Tensor"
-            )
-
-        return example_output
-
-    @property
-    def output_frames(
-        self,
-    ) -> Union[Optional[SlidingWindow], Tuple[Optional[SlidingWindow]]]:
-        """Output frames as (tuple of) SlidingWindow(s)"""
-
-        def __output_frames(
+        def __example_output(
             example_output: torch.Tensor,
             specifications: Specifications = None,
-        ) -> Optional[SlidingWindow]:
+        ) -> Output:
+            _, num_frames, dimension = example_output.shape
+
             if specifications.resolution == Resolution.FRAME:
-                _, num_frames, _ = example_output.shape
                 frame_duration = specifications.duration / num_frames
-                return SlidingWindow(step=frame_duration, duration=frame_duration)
+                frames = SlidingWindow(step=frame_duration, duration=frame_duration)
+            else:
+                frames = None
 
-            return None
-
-        return map_with_specifications(
-            self.specifications, __output_frames, self.example_output()
-        )
-
-    @property
-    def output_dimension(self) -> Union[int, Tuple[int]]:
-        """Output dimension as (tuple of) int(s)"""
-
-        duration = next(iter(self.specifications)).duration
-        example_output = self.example_output(duration=duration)
-
-        def __output_dimension(example_output: torch.Tensor, **kwargs) -> int:
-            return example_output.shape[-1]
+            return Output(
+                num_frames=num_frames,
+                dimension=dimension,
+                frames=frames,
+            )
 
         return map_with_specifications(
-            self.specifications, __output_dimension, example_output
+            self.specifications, __example_output, example_output
         )
 
     def setup(self, stage=None):
@@ -265,6 +258,9 @@ class Model(pl.LightningModule):
             self.task.setup_loss_func()
             # setup custom validation metrics
             self.task.setup_validation_metric()
+
+            # cache for later (and to avoid later CUDA error with multiprocessing)
+            _ = self.example_output
 
         # list of layers after adding task-dependent layers
         after = set((name, id(module)) for name, module in self.named_modules())
