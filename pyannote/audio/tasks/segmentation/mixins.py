@@ -26,7 +26,7 @@ import random
 import warnings
 from collections import defaultdict
 from functools import cached_property
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Sequence, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,14 +73,8 @@ class SegmentationTaskMixin:
 
         return file
 
-    def setup(self, stage: Optional[str] = None):
-        """Setup method
-
-        Parameters
-        ----------
-        stage : {'fit', 'validate', 'test'}, optional
-            Setup stage. Defaults to 'fit'.
-        """
+    def setup(self):
+        """Setup"""
 
         # duration of training chunks
         # TODO: handle variable duration case

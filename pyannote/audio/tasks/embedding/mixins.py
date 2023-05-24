@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 import math
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Sequence, Union
 
 import torch
 import torch.nn.functional as F
@@ -75,7 +75,7 @@ class SupervisedRepresentationLearningTaskMixin:
     def batch_size(self, batch_size: int):
         self.batch_size_ = batch_size
 
-    def setup(self, stage: Optional[str] = None):
+    def setup(self):
         # loop over the training set, remove annotated regions shorter than
         # chunk duration, and keep track of the reference annotations, per class.
 

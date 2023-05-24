@@ -119,8 +119,8 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
         # classes should be detected. therefore, we postpone the definition of
         # specifications to setup()
 
-    def setup(self, stage: Optional[str] = None):
-        super().setup(stage=stage)
+    def setup(self):
+        super().setup()
 
         self.specifications = Specifications(
             classes=self.classes,

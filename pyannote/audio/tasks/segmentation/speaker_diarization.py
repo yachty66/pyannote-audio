@@ -23,7 +23,7 @@
 import math
 import warnings
 from collections import Counter
-from typing import Dict, Literal, Optional, Sequence, Text, Tuple, Union
+from typing import Dict, Literal, Sequence, Text, Tuple, Union
 
 import numpy as np
 import torch
@@ -186,8 +186,8 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         self.weight = weight
         self.vad_loss = vad_loss
 
-    def setup(self, stage: Optional[str] = None):
-        super().setup(stage=stage)
+    def setup(self):
+        super().setup()
 
         # estimate maximum number of speakers per chunk when not provided
         if self.max_speakers_per_chunk is None:
