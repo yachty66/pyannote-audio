@@ -101,8 +101,8 @@ class Model(pl.LightningModule):
 
     @task.setter
     def task(self, task: Task):
-        self._task = task
         del self.specifications
+        self._task = task
 
     def build(self):
         # use this method to add task-dependent layers to the model
@@ -225,7 +225,7 @@ class Model(pl.LightningModule):
 
     def setup(self, stage=None):
         if stage == "fit":
-            self.task.setup()
+            self.task.setup_metadata()
 
         # list of layers before adding task-dependent layers
         before = set((name, id(module)) for name, module in self.named_modules())
@@ -311,6 +311,7 @@ class Model(pl.LightningModule):
 
         self.specifications = checkpoint["pyannote.audio"]["specifications"]
 
+        # add task-dependent (e.g. final classifier) layers
         self.setup()
 
     def forward(

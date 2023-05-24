@@ -268,7 +268,28 @@ class Task(pl.LightningDataModule):
         """
         pass
 
-    def setup(self):
+    @property
+    def specifications(self) -> Union[Specifications, Tuple[Specifications]]:
+        # setup metadata on-demand the first time specifications are requested and missing
+        if not hasattr(self, "_specifications"):
+            self.setup_metadata()
+        return self._specifications
+
+    @specifications.setter
+    def specifications(
+        self, specifications: Union[Specifications, Tuple[Specifications]]
+    ):
+        self._specifications = specifications
+
+    @property
+    def has_setup_metadata(self):
+        return getattr(self, "_has_setup_metadata", False)
+
+    @has_setup_metadata.setter
+    def has_setup_metadata(self, value: bool):
+        self._has_setup_metadata = value
+
+    def setup_metadata(self):
         """Called at the beginning of training at the very beginning of Model.setup(stage="fit")
 
         Notes
@@ -278,7 +299,10 @@ class Task(pl.LightningDataModule):
         If `specifications` attribute has not been set in `__init__`,
         `setup` is your last chance to set it.
         """
-        pass
+
+        if not self.has_setup_metadata:
+            self.setup()
+            self.has_setup_metadata = True
 
     def setup_loss_func(self):
         pass
