@@ -18,15 +18,13 @@
     * replace `Audio(mono=True)` by `Audio(mono="downmix")`;
     * replace `Audio(mono=False)` by `Audio()`.
   - BREAKING(model): get rid of (flaky) `Model.introspection`
-    If, for some weird reason, you wrote some custom code based on that, you should instead rely on:
-    * `Model.example_output(duration=...)` to get example output(s)
-    * `Model.example_output.frames` to get output frame resolution(s)
-    * `Model.example_output.dimension` to get output dimension(s)
+    If, for some weird reason, you wrote some custom code based on that,
+    you should instead rely on `Model.example_output`.
 
 
 ### Features and improvements
 
-  - feat(task): add support for multi-task models (for inference)
+  - feat(task): add support for multi-task models
   - feat(pipeline): send pipeline to device with `pipeline.to(device)`
   - feat(pipeline): make `segmentation_batch_size` and `embedding_batch_size` mutable in `SpeakerDiarization` pipeline (they now default to `1`)
   - feat(task): add [powerset](https://arxiv.org/PLACEHOLDER) support to `SpeakerDiarization` task
