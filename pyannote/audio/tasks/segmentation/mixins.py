@@ -25,11 +25,13 @@ import math
 import random
 import warnings
 from collections import defaultdict
+from functools import cached_property
 from typing import Dict, Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from pyannote.core import SlidingWindow
 from pyannote.database.protocol import SegmentationProtocol, SpeakerDiarizationProtocol
 from pyannote.database.protocol.protocol import Scope, Subset
 from pytorch_lightning.loggers import MLFlowLogger, TensorBoardLogger
@@ -49,7 +51,6 @@ class SegmentationTaskMixin:
     """Methods common to most segmentation tasks"""
 
     def get_file(self, file_id):
-
         file = dict()
 
         file["audio"] = str(self.audios[file_id], encoding="utf-8")
@@ -121,7 +122,6 @@ class SegmentationTaskMixin:
             files_iter = self.protocol.train()
 
         for file_id, file in enumerate(files_iter):
-
             # gather metadata and update metadata_unique_values so that each metadatum
             # (e.g. source database or label) is represented by an integer.
             metadatum = dict()
@@ -142,7 +142,6 @@ class SegmentationTaskMixin:
             # Different files may be annotated using a different set of classes
             # (e.g. one database for speech/music/noise, and another one for male/female/child)
             if isinstance(self.protocol, SegmentationProtocol):
-
                 if "classes" in file:
                     local_classes = file["classes"]
                 else:
@@ -191,7 +190,6 @@ class SegmentationTaskMixin:
             # keep track of any other (integer or string) metadata provided by the protocol
             # (e.g. a "domain" key for domain-adversarial training)
             for key in remaining_metadata_keys:
-
                 value = file[key]
 
                 if isinstance(value, str):
@@ -233,7 +231,6 @@ class SegmentationTaskMixin:
             # annotated regions and duration
             _annotated_duration = 0.0
             for segment in file["annotated"]:
-
                 # skip annotated regions that are shorter than training chunk duration
                 if segment.duration < duration:
                     continue
@@ -255,13 +252,11 @@ class SegmentationTaskMixin:
 
             # annotations
             for segment, _, label in file["annotation"].itertracks(yield_label=True):
-
                 # "scope" is provided by speaker diarization protocols to indicate
                 # whether speaker labels are local to the file ('file'), consistent across
                 # all files in a database ('database'), or globally consistent ('global')
 
                 if "scope" in file:
-
                     # 0 = 'file'
                     # 1 = 'database'
                     # 2 = 'global'
@@ -276,7 +271,6 @@ class SegmentationTaskMixin:
                     database_label_idx = global_label_idx = -1
 
                     if scope > 0:  # 'database' or 'global'
-
                         # update list of database-scope labels
                         if label not in database_unique_labels:
                             database_unique_labels.append(label)
@@ -285,7 +279,6 @@ class SegmentationTaskMixin:
                         database_label_idx = database_unique_labels.index(label)
 
                     if scope > 1:  # 'global'
-
                         # update list of global-scope labels
                         if label not in unique_labels:
                             unique_labels.append(label)
@@ -381,7 +374,6 @@ class SegmentationTaskMixin:
 
         # iterate over files in the validation subset
         for file_id in validation_file_ids:
-
             # get annotated regions in file
             annotated_regions = self.annotated_regions[
                 self.annotated_regions["file_id"] == file_id
@@ -389,7 +381,6 @@ class SegmentationTaskMixin:
 
             # iterate over annotated regions
             for annotated_region in annotated_regions:
-
                 # number of chunks in annotated region
                 num_chunks = round(annotated_region["duration"] // duration)
 
@@ -400,6 +391,15 @@ class SegmentationTaskMixin:
 
         dtype = [("file_id", "i"), ("start", "f"), ("duration", "f")]
         self.validation_chunks = np.array(validation_chunks, dtype=dtype)
+
+    @cached_property
+    def frames(self) -> SlidingWindow:
+        return self.model.output_frames
+
+    @cached_property
+    def num_frames_per_chunk(self) -> int:
+        batch_size, num_frames, num_classes = self.model.example_output().shape
+        return num_frames
 
     def default_metric(
         self,
@@ -450,13 +450,11 @@ class SegmentationTaskMixin:
         num_chunks_per_file = getattr(self, "num_chunks_per_file", 1)
 
         while True:
-
             # select one file at random (with probability proportional to its annotated duration)
             file_id = np.random.choice(file_ids, p=prob_annotated_duration)
 
             # generate `num_chunks_per_file` chunks from this file
             for _ in range(num_chunks_per_file):
-
                 # find indices of annotated regions in this file
                 annotated_region_indices = np.where(
                     self.annotated_regions["file_id"] == file_id
@@ -510,7 +508,6 @@ class SegmentationTaskMixin:
                 subchunks[product] = self.train__iter__helper(rng, **filters)
 
         while True:
-
             # select one subchunk generator at random (with uniform probability)
             # so that it is balanced on average
             if balance is not None:
@@ -686,7 +683,6 @@ class SegmentationTaskMixin:
 
         # plot each sample
         for sample_idx in range(num_samples):
-
             # find where in the grid it should be plotted
             row_idx = sample_idx // nrows
             col_idx = sample_idx % ncols

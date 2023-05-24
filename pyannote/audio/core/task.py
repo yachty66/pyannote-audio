@@ -97,7 +97,7 @@ class Specifications:
     permutation_invariant: bool = False
 
     @cached_property
-    def powerset(self):
+    def powerset(self) -> bool:
         if self.powerset_max_classes is None:
             return False
 
@@ -119,6 +119,12 @@ class Specifications:
                 for i in range(0, self.powerset_max_classes + 1)
             )
         )
+
+    def __len__(self):
+        return 1
+
+    def __iter__(self):
+        yield self
 
 
 class TrainDataset(IterableDataset):
@@ -193,7 +199,7 @@ class Task(pl.LightningDataModule):
 
     Attributes
     ----------
-    specifications : Specifications or dict of Specifications
+    specifications : Specifications or tuple of Specifications
         Task specifications (available after `Task.setup` has been called.)
     """
 
@@ -374,6 +380,11 @@ class Task(pl.LightningDataModule):
         loss : {str: torch.tensor}
             {"loss": loss}
         """
+
+        if isinstance(self.specifications, tuple):
+            raise NotImplementedError(
+                "Default training/validation step is not implemented for multi-task."
+            )
 
         # forward pass
         y_pred = self.model(batch["X"])

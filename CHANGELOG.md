@@ -5,10 +5,10 @@
 ### Breaking changes
 
   - BREAKING(task): rename `Segmentation` task to `SpeakerDiarization`
-  - BREAKING(task): remove support for variable chunk duration
+  - BREAKING(task): remove support for variable chunk duration for segmentation tasks
   - BREAKING(pipeline): pipeline defaults to CPU (use `pipeline.to(device)`)
   - BREAKING(pipeline): remove `SpeakerSegmentation` pipeline (use `SpeakerDiarization` pipeline)
-  - BREAKING(pipeline): remove support `FINCHClustering` and `HiddenMarkovModelClustering`
+  - BREAKING(pipeline): remove support for `FINCHClustering` and `HiddenMarkovModelClustering`
   - BREAKING(pipeline): remove `segmentation_duration` parameter from `SpeakerDiarization` pipeline (defaults to `duration` of segmentation model)
   - BREAKING(setup): drop support for Python 3.7
   - BREAKING(io): channels are now 0-indexed (used to be 1-indexed)
@@ -17,9 +17,16 @@
     * replace `Audio()` by `Audio(mono="downmix")`;
     * replace `Audio(mono=True)` by `Audio(mono="downmix")`;
     * replace `Audio(mono=False)` by `Audio()`.
+  - BREAKING(model): get rid of (flaky) `Model.introspection`
+    If, for some weird reason, you wrote some custom code based on that, you should instead rely on:
+    * `Model.example_output(duration=...)` to get example output(s)
+    * `Model.output_frames` to get output frame resolution(s)
+    * `Model.output_dimension` to get output dimension(s)
+
 
 ### Features and improvements
 
+  - feat(task): add support for multi-task models (for inference)
   - feat(pipeline): send pipeline to device with `pipeline.to(device)`
   - feat(pipeline): make `segmentation_batch_size` and `embedding_batch_size` mutable in `SpeakerDiarization` pipeline (they now default to `1`)
   - feat(task): add [powerset](https://arxiv.org/PLACEHOLDER) support to `SpeakerDiarization` task

@@ -29,7 +29,7 @@ import numpy as np
 import torch
 import torch.nn.functional
 from matplotlib import pyplot as plt
-from pyannote.core import Segment, SlidingWindow, SlidingWindowFeature
+from pyannote.core import Segment, SlidingWindowFeature
 from pyannote.database.protocol import SpeakerDiarizationProtocol
 from pyannote.database.protocol.protocol import Scope, Subset
 from pytorch_lightning.loggers import MLFlowLogger, TensorBoardLogger
@@ -327,13 +327,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         sample = dict()
         sample["X"], _ = self.model.audio.crop(file, chunk, duration=duration)
 
-        # use model introspection to predict how many frames it will output
-        # TODO: this should be cached
-        num_samples = sample["X"].shape[1]
-        num_frames, _ = self.model.introspection(num_samples)
-        resolution = duration / num_frames
-        frames = SlidingWindow(start=0.0, duration=resolution, step=resolution)
-
         # gather all annotations of current file
         annotations = self.annotations[self.annotations["file_id"] == file_id]
 
@@ -344,9 +337,9 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
 
         # discretize chunk annotations at model output resolution
         start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
-        start_idx = np.floor(start / resolution).astype(int)
+        start_idx = np.floor(start / self.frames.step).astype(int)
         end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
-        end_idx = np.ceil(end / resolution).astype(int)
+        end_idx = np.ceil(end / self.frames.step).astype(int)
 
         # get list and number of labels for current scope
         labels = list(np.unique(chunk_annotations[label_scope_key]))
@@ -356,7 +349,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             pass
 
         # initial frame-level targets
-        y = np.zeros((num_frames, num_labels), dtype=np.uint8)
+        y = np.zeros((self.num_frames_per_chunk, num_labels), dtype=np.uint8)
 
         # map labels to indices
         mapping = {label: idx for idx, label in enumerate(labels)}
@@ -367,7 +360,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             mapped_label = mapping[label]
             y[start:end, mapped_label] = 1
 
-        sample["y"] = SlidingWindowFeature(y, frames, labels=labels)
+        sample["y"] = SlidingWindowFeature(y, self.frames, labels=labels)
 
         metadata = self.metadata[file_id]
         sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}
@@ -565,11 +558,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         weight[:, num_frames - warm_up_right :] = 0.0
 
         if self.specifications.powerset:
-            powerset = torch.nn.functional.one_hot(
-                torch.argmax(prediction, dim=-1),
-                self.model.powerset.num_powerset_classes,
-            ).float()
-            multilabel = self.model.powerset.to_multilabel(powerset)
+            multilabel = self.model.powerset.to_multilabel(prediction)
             permutated_target, _ = permutate(multilabel, target)
             permutated_target_powerset = self.model.powerset.to_powerset(
                 permutated_target.float()
@@ -698,11 +687,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         weight[:, num_frames - warm_up_right :] = 0.0
 
         if self.specifications.powerset:
-            powerset = torch.nn.functional.one_hot(
-                torch.argmax(prediction, dim=-1),
-                self.model.powerset.num_powerset_classes,
-            ).float()
-            multilabel = self.model.powerset.to_multilabel(powerset)
+            multilabel = self.model.powerset.to_multilabel(prediction)
             permutated_target, _ = permutate(multilabel, target)
 
             # FIXME: handle case where target have too many speakers?
