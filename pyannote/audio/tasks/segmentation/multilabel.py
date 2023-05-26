@@ -222,11 +222,11 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
             return None
 
         self.model.log(
-            f"{self.logging_prefix}TrainLoss",
+            "loss/train",
             loss,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
         )
         return {"loss": loss}
@@ -249,7 +249,7 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
         loss = F.binary_cross_entropy(y_pred, y_true.type(torch.float))
 
         self.model.log(
-            f"{self.logging_prefix}ValLoss",
+            "loss/val",
             loss,
             on_step=False,
             on_epoch=True,
@@ -277,4 +277,4 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
         pytorch_lightning.callbacks.EarlyStopping
         """
 
-        return f"{self.logging_prefix}ValLoss", "min"
+        return "ValLoss", "min"

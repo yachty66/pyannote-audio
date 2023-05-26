@@ -525,17 +525,6 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         target = target[keep]
         waveform = waveform[keep]
 
-        # log effective batch size
-        self.model.log(
-            f"{self.logging_prefix}BatchSize",
-            keep.sum(),
-            prog_bar=False,
-            logger=True,
-            on_step=False,
-            on_epoch=True,
-            reduce_fx="mean",
-        )
-
         # corner case
         if not keep.any():
             return None
@@ -576,7 +565,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             )
 
         self.model.log(
-            f"{self.logging_prefix}TrainSegLoss",
+            "loss/train/segmentation",
             seg_loss,
             on_step=False,
             on_epoch=True,
@@ -601,7 +590,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
                 )
 
             self.model.log(
-                f"{self.logging_prefix}TrainVADLoss",
+                "loss/train/vad",
                 vad_loss,
                 on_step=False,
                 on_epoch=True,
@@ -616,11 +605,11 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             return None
 
         self.model.log(
-            f"{self.logging_prefix}TrainLoss",
+            "loss/train",
             loss,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
         )
 
@@ -632,20 +621,20 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         """Returns diarization error rate and its components"""
 
         if self.specifications.powerset:
-            return [
-                DiarizationErrorRate(0.5),
-                SpeakerConfusionRate(0.5),
-                MissedDetectionRate(0.5),
-                FalseAlarmRate(0.5),
-            ]
+            return {
+                "DiarizationErrorRate": DiarizationErrorRate(0.5),
+                "DiarizationErrorRate/Confusion": SpeakerConfusionRate(0.5),
+                "DiarizationErrorRate/Miss": MissedDetectionRate(0.5),
+                "DiarizationErrorRate/FalseAlarm": FalseAlarmRate(0.5),
+            }
 
-        return [
-            OptimalDiarizationErrorRate(),
-            OptimalDiarizationErrorRateThreshold(),
-            OptimalSpeakerConfusionRate(),
-            OptimalMissedDetectionRate(),
-            OptimalFalseAlarmRate(),
-        ]
+        return {
+            "DiarizationErrorRate": OptimalDiarizationErrorRate(),
+            "DiarizationErrorRate/Threshold": OptimalDiarizationErrorRateThreshold(),
+            "DiarizationErrorRate/Confusion": OptimalSpeakerConfusionRate(),
+            "DiarizationErrorRate/Miss": OptimalMissedDetectionRate(),
+            "DiarizationErrorRate/FalseAlarm": OptimalFalseAlarmRate(),
+        }
 
     # TODO: no need to compute gradient in this method
     def validation_step(self, batch, batch_idx: int):
@@ -708,7 +697,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
             )
 
         self.model.log(
-            f"{self.logging_prefix}ValSegLoss",
+            "loss/val/segmentation",
             seg_loss,
             on_step=False,
             on_epoch=True,
@@ -733,7 +722,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
                 )
 
             self.model.log(
-                f"{self.logging_prefix}ValVADLoss",
+                "loss/val/vad",
                 vad_loss,
                 on_step=False,
                 on_epoch=True,
@@ -744,7 +733,7 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
         loss = seg_loss + vad_loss
 
         self.model.log(
-            f"{self.logging_prefix}ValLoss",
+            "loss/val",
             loss,
             on_step=False,
             on_epoch=True,
@@ -841,14 +830,12 @@ class SpeakerDiarization(SegmentationTaskMixin, Task):
 
         for logger in self.model.loggers:
             if isinstance(logger, TensorBoardLogger):
-                logger.experiment.add_figure(
-                    f"{self.logging_prefix}ValSamples", fig, self.model.current_epoch
-                )
+                logger.experiment.add_figure("samples", fig, self.model.current_epoch)
             elif isinstance(logger, MLFlowLogger):
                 logger.experiment.log_figure(
                     run_id=logger.run_id,
                     figure=fig,
-                    artifact_file=f"{self.logging_prefix}ValSamples_epoch{self.model.current_epoch}.png",
+                    artifact_file=f"samples_epoch{self.model.current_epoch}.png",
                 )
 
         plt.close(fig)

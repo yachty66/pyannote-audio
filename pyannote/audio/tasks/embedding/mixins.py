@@ -240,11 +240,11 @@ class SupervisedRepresentationLearningTaskMixin:
             return None
 
         self.model.log(
-            f"{self.logging_prefix}TrainLoss",
+            "loss/train",
             loss,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
         )
 
