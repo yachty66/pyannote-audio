@@ -44,6 +44,7 @@
   - fix(pipeline): fix reproducibility issue with Ampere CUDA devices
   - fix(pipeline): fix support for IOBase audio
   - fix(pipeline): fix corner case with no speaker
+  - improve(task): shorten and improve structure of Tensorboard tags
 
 ### Dependencies
 
