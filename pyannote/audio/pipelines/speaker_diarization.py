@@ -482,6 +482,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             if self._segmentation.model.specifications.powerset
             else self.segmentation.threshold,
             frames=self._frames,
+            warm_up=(0.0, 0.0),
         )
         hook("speaker_counting", count)
         #   shape: (num_frames, 1)
