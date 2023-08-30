@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> I propose (paid) scientific [consulting services](https://herve.niderb.fr/consulting.html) to companies willing to make the most of their data and open-source speech processing toolkits (and pyannote in particular). 
+> I propose (paid) scientific [consulting services](https://herve.niderb.fr/consulting.html) to companies willing to make the most of their data and open-source speech processing toolkits (and `pyannote` in particular). 
 
 # Speaker diarization with `pyannote.audio`
 
