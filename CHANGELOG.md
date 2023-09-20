@@ -51,6 +51,7 @@
   - fix(pipeline): fix support for IOBase audio
   - fix(pipeline): fix corner case with no speaker
   - fix(train): prevent metadata preparation to happen twice
+  - fix(task): fix support for "balance" option
   - improve(task): shorten and improve structure of Tensorboard tags
 
 ### Dependencies
