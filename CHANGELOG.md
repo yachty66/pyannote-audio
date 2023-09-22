@@ -57,7 +57,7 @@
 ### Dependencies
 
   - setup: switch to torch 2.0+, torchaudio 2.0+, soundfile 0.12+, lightning 2.0+, torchmetrics 0.11+
-  - setup: switch to pyannote.core 5.0+ and pyannote.database 5.0+
+  - setup: switch to pyannote.core 5.0+, pyannote.database 5.0+, and pyannote.pipeline 3.0+
   - setup: switch to speechbrain 0.5.14+
 
 ## Version 2.1.1 (2022-10-27)
