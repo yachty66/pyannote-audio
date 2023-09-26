@@ -26,10 +26,11 @@ from typing import Optional
 
 import hydra
 from hydra.utils import instantiate
+from lightning.pytorch import seed_everything
 from omegaconf import DictConfig, OmegaConf
 
 # from pyannote.audio.core.callback import GraduallyUnfreeze
-from pyannote.database import FileFinder, get_protocol
+from pyannote.database import FileFinder, registry
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -37,7 +38,6 @@ from pytorch_lightning.callbacks import (
     RichProgressBar,
 )
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.utilities.seed import seed_everything
 from torch_audiomentations.utils.config import from_dict as get_augmentation
 
 from pyannote.audio.core.io import get_torchaudio_info
@@ -45,18 +45,21 @@ from pyannote.audio.core.io import get_torchaudio_info
 
 @hydra.main(config_path="train_config", config_name="config")
 def train(cfg: DictConfig) -> Optional[float]:
-
     # make sure to set the random seed before the instantiation of Trainer
     # so that each model initializes with the same weights when using DDP.
     seed = int(os.environ.get("PL_GLOBAL_SEED", "0"))
     seed_everything(seed=seed)
+
+    # load databases into registry
+    for database_yml in cfg.registry.split(","):
+        registry.load_database(database_yml)
 
     # instantiate training protocol with optional preprocessors
     preprocessors = {"audio": FileFinder(), "torchaudio.info": get_torchaudio_info}
     if "preprocessor" in cfg:
         preprocessor = instantiate(cfg.preprocessor)
         preprocessors[preprocessor.preprocessed_key] = preprocessor
-    protocol = get_protocol(cfg.protocol, preprocessors=preprocessors)
+    protocol = registry.get_protocol(cfg.protocol, preprocessors=preprocessors)
 
     # instantiate data augmentation
     augmentation = (
@@ -96,7 +99,11 @@ def train(cfg: DictConfig) -> Optional[float]:
 
     model.configure_optimizers = MethodType(configure_optimizers, model)
 
-    callbacks = [RichProgressBar(), LearningRateMonitor(logging_interval="step")]
+    # avoid creating big log files
+    callbacks = [
+        RichProgressBar(refresh_rate=20, leave=True),
+        LearningRateMonitor(),
+    ]
 
     if fine_tuning:
         # TODO: configure layer freezing
@@ -108,7 +115,7 @@ def train(cfg: DictConfig) -> Optional[float]:
     checkpoint = ModelCheckpoint(
         monitor=monitor,
         mode=direction,
-        save_top_k=None if monitor is None else 5,
+        save_top_k=None if monitor is None else 1,
         every_n_epochs=1,
         save_last=True,
         save_weights_only=False,
@@ -126,6 +133,7 @@ def train(cfg: DictConfig) -> Optional[float]:
             patience=100,
             strict=True,
             verbose=False,
+            check_finite=True,
         )
         callbacks.append(early_stopping)
 

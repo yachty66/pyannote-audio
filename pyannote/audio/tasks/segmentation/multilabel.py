@@ -20,12 +20,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import warnings
-from typing import Dict, Optional, Sequence, Text, Tuple, Union, List
+from typing import Dict, List, Optional, Sequence, Text, Tuple, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
+from pyannote.core import Segment, SlidingWindowFeature
 from pyannote.database import Protocol
+from pyannote.database.protocol import SegmentationProtocol
 from torch_audiomentations.core.transforms_interface import BaseWaveformTransform
 from torchmetrics import Metric
 
@@ -36,7 +38,7 @@ from pyannote.audio.tasks.segmentation.mixins import SegmentationTaskMixin
 class MultiLabelSegmentation(SegmentationTaskMixin, Task):
     """Generic multi-label segmentation
 
-    Multi-label segmentation is the process of detecting temporal intervals 
+    Multi-label segmentation is the process of detecting temporal intervals
     when a specific audio class is active.
 
     Example use cases include speaker tracking, gender (male/female)
@@ -56,10 +58,10 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
         parts, only the remaining central part of each chunk is used for computing the
         loss during training, and for aggregating scores during inference.
         Defaults to 0. (i.e. no warm-up).
-    balance: str, optional
-        When provided, training samples are sampled uniformly with respect to that key.
-        For instance, setting `balance` to "uri" will make sure that each file will be
-        equally represented in the training samples.
+    balance: Sequence[Text], optional
+        When provided, training samples are sampled uniformly with respect to these keys.
+        For instance, setting `balance` to ["database","subset"] will make sure that each
+        database & subset combination will be equally represented in the training samples.
     weight: str, optional
         When provided, use this key to as frame-wise weight in loss function.
     batch_size : int, optional
@@ -80,19 +82,24 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
     """
 
     def __init__(
-            self,
-            protocol: Protocol,
-            classes: Optional[List[str]] = None,
-            duration: float = 2.0,
-            warm_up: Union[float, Tuple[float, float]] = 0.0,
-            balance: Text = None,
-            weight: Text = None,
-            batch_size: int = 32,
-            num_workers: int = None,
-            pin_memory: bool = False,
-            augmentation: BaseWaveformTransform = None,
-            metric: Union[Metric, Sequence[Metric], Dict[str, Metric]] = None,
+        self,
+        protocol: Protocol,
+        classes: Optional[List[str]] = None,
+        duration: float = 2.0,
+        warm_up: Union[float, Tuple[float, float]] = 0.0,
+        balance: Sequence[Text] = None,
+        weight: Text = None,
+        batch_size: int = 32,
+        num_workers: int = None,
+        pin_memory: bool = False,
+        augmentation: BaseWaveformTransform = None,
+        metric: Union[Metric, Sequence[Metric], Dict[str, Metric]] = None,
     ):
+        if not isinstance(protocol, SegmentationProtocol):
+            raise ValueError(
+                f"MultiLabelSegmentation task expects a SegmentationProtocol but you gave {type(protocol)}. "
+            )
+
         super().__init__(
             protocol,
             duration=duration,
@@ -109,49 +116,165 @@ class MultiLabelSegmentation(SegmentationTaskMixin, Task):
         self.classes = classes
 
         # task specification depends on the data: we do not know in advance which
-        # classes should be detected. therefore, we postpone the definition of 
+        # classes should be detected. therefore, we postpone the definition of
         # specifications to setup()
 
-    def setup(self, stage: Optional[str] = None):
-
-        super().setup(stage=stage)
-
-        classes_from_training_set = sorted(self._train_metadata["annotation"])
-        if self.classes is None:
-            classes = classes_from_training_set
-        else:
-            if set(classes_from_training_set) != set(self.classes):
-                warnings.warn(
-                    f"Mismatch between classes passed to the task ({self.classes}) "
-                    f"and those of the training set ({classes_from_training_set})."
-                )
-            classes = self.classes
+    def setup(self):
+        super().setup()
 
         self.specifications = Specifications(
-            classes=classes,
+            classes=self.classes,
             problem=Problem.MULTI_LABEL_CLASSIFICATION,
             resolution=Resolution.FRAME,
             duration=self.duration,
+            min_duration=self.min_duration,
             warm_up=self.warm_up,
         )
 
-    def collate_y(self, batch) -> torch.Tensor:
+    def prepare_chunk(self, file_id: int, start_time: float, duration: float):
+        """Prepare chunk for multi-label segmentation
 
-        labels = self.specifications.classes
+        Parameters
+        ----------
+        file_id : int
+            File index
+        start_time : float
+            Chunk start time
+        duration : float
+            Chunk duration.
 
-        batch_size, num_frames, num_labels = (
-            len(batch),
-            len(batch[0]["y"]),
-            len(labels),
+        Returns
+        -------
+        sample : dict
+            Dictionary containing the chunk data with the following keys:
+            - `X`: waveform
+            - `y`: target (see Notes below)
+            - `meta`:
+                - `database`: database index
+                - `file`: file index
+
+        Notes
+        -----
+        y is a trinary matrix with shape (num_frames, num_classes):
+            -  0: class is inactive
+            -  1: class is active
+            - -1: we have no idea
+
+        """
+
+        file = self.get_file(file_id)
+
+        chunk = Segment(start_time, start_time + duration)
+
+        sample = dict()
+        sample["X"], _ = self.model.audio.crop(file, chunk, duration=duration)
+        # gather all annotations of current file
+        annotations = self.annotations[self.annotations["file_id"] == file_id]
+
+        # gather all annotations with non-empty intersection with current chunk
+        chunk_annotations = annotations[
+            (annotations["start"] < chunk.end) & (annotations["end"] > chunk.start)
+        ]
+
+        # discretize chunk annotations at model output resolution
+        start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
+        start_idx = np.floor(start / self.model.example_output.frames.step).astype(int)
+        end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
+        end_idx = np.ceil(end / self.model.example_output.frames.step).astype(int)
+
+        # frame-level targets (-1 for un-annotated classes)
+        y = -np.ones(
+            (self.model.example_output.num_frames, len(self.classes)), dtype=np.int8
         )
-        Y = np.zeros((batch_size, num_frames, num_labels), dtype=np.int64)
+        y[:, self.annotated_classes[file_id]] = 0
+        for start, end, label in zip(
+            start_idx, end_idx, chunk_annotations["global_label_idx"]
+        ):
+            y[start:end, label] = 1
 
-        for i, b in enumerate(batch):
-            for local_idx, label in enumerate(b["y"].labels):
-                global_idx = labels.index(label)
-                Y[i, :, global_idx] = b["y"].data[:, local_idx]
+        sample["y"] = SlidingWindowFeature(
+            y, self.model.example_output.frames, labels=self.classes
+        )
 
-        return torch.from_numpy(Y)
+        metadata = self.metadata[file_id]
+        sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}
+        sample["meta"]["file"] = file_id
 
-    # TODO: add option to give more weights to smaller classes
-    # TODO: add option to balance training samples between classes
+        return sample
+
+    def training_step(self, batch, batch_idx: int):
+        X = batch["X"]
+        y_pred = self.model(X)
+        y_true = batch["y"]
+        assert y_pred.shape == y_true.shape
+
+        # TODO: add support for frame weights
+        # TODO: add support for class weights
+
+        # mask (frame, class) index for which label is missing
+        mask: torch.Tensor = y_true != -1
+        y_pred = y_pred[mask]
+        y_true = y_true[mask]
+        loss = F.binary_cross_entropy(y_pred, y_true.type(torch.float))
+
+        # skip batch if something went wrong for some reason
+        if torch.isnan(loss):
+            return None
+
+        self.model.log(
+            "loss/train",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            logger=True,
+        )
+        return {"loss": loss}
+
+    def validation_step(self, batch, batch_idx: int):
+        X = batch["X"]
+        y_pred = self.model(X)
+        y_true = batch["y"]
+        assert y_pred.shape == y_true.shape
+
+        # TODO: add support for frame weights
+        # TODO: add support for class weights
+
+        # TODO: compute metrics for each class separately
+
+        # mask (frame, class) index for which label is missing
+        mask: torch.Tensor = y_true != -1
+        y_pred = y_pred[mask]
+        y_true = y_true[mask]
+        loss = F.binary_cross_entropy(y_pred, y_true.type(torch.float))
+
+        self.model.log(
+            "loss/val",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        return {"loss": loss}
+
+    @property
+    def val_monitor(self):
+        """Quantity (and direction) to monitor
+
+        Useful for model checkpointing or early stopping.
+
+        Returns
+        -------
+        monitor : str
+            Name of quantity to monitor.
+        mode : {'min', 'max}
+            Minimize
+
+        See also
+        --------
+        pytorch_lightning.callbacks.ModelCheckpoint
+        pytorch_lightning.callbacks.EarlyStopping
+        """
+
+        return "loss/val", "min"

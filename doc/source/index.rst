@@ -9,6 +9,8 @@ Installation
 
 ::
 
+  $ conda create -n pyannote python=3.10
+  $ conda activate pyannote
   $ pip install pyannote.audio
 
 
@@ -17,5 +19,3 @@ API documentation
 
 .. toctree::
    :maxdepth: 2
-
-   changelog

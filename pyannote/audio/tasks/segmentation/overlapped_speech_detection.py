@@ -23,7 +23,8 @@
 
 from typing import Dict, Sequence, Text, Tuple, Union
 
-import torch
+import numpy as np
+from pyannote.core import Segment, SlidingWindowFeature
 from pyannote.database import Protocol
 from torch_audiomentations.core.transforms_interface import BaseWaveformTransform
 from torchmetrics import Metric
@@ -58,10 +59,10 @@ class OverlappedSpeechDetection(SegmentationTaskMixin, Task):
         parts, only the remaining central part of each chunk is used for computing the
         loss during training, and for aggregating scores during inference.
         Defaults to 0. (i.e. no warm-up).
-    balance: str, optional
-        When provided, training samples are sampled uniformly with respect to that key.
-        For instance, setting `balance` to "uri" will make sure that each file will be
-        equally represented in the training samples.
+    balance: Sequence[Text], optional
+        When provided, training samples are sampled uniformly with respect to these keys.
+        For instance, setting `balance` to ["database","subset"] will make sure that each
+        database & subset combination will be equally represented in the training samples.
     overlap: dict, optional
         Controls how artificial chunks with overlapping speech are generated:
         - "probability" key is the probability of artificial overlapping chunks. Setting
@@ -97,7 +98,7 @@ class OverlappedSpeechDetection(SegmentationTaskMixin, Task):
         duration: float = 2.0,
         warm_up: Union[float, Tuple[float, float]] = 0.0,
         overlap: dict = OVERLAP_DEFAULTS,
-        balance: Text = None,
+        balance: Sequence[Text] = None,
         weight: Text = None,
         batch_size: int = 32,
         num_workers: int = None,
@@ -105,7 +106,6 @@ class OverlappedSpeechDetection(SegmentationTaskMixin, Task):
         augmentation: BaseWaveformTransform = None,
         metric: Union[Metric, Sequence[Metric], Dict[str, Metric]] = None,
     ):
-
         super().__init__(
             protocol,
             duration=duration,
@@ -121,6 +121,7 @@ class OverlappedSpeechDetection(SegmentationTaskMixin, Task):
             problem=Problem.BINARY_CLASSIFICATION,
             resolution=Resolution.FRAME,
             duration=self.duration,
+            min_duration=self.min_duration,
             warm_up=self.warm_up,
             classes=[
                 "overlap",
@@ -131,20 +132,62 @@ class OverlappedSpeechDetection(SegmentationTaskMixin, Task):
         self.balance = balance
         self.weight = weight
 
-    def adapt_y(self, collated_y: torch.Tensor) -> torch.Tensor:
-        """Get overlapped speech detection targets
+    def prepare_chunk(self, file_id: int, start_time: float, duration: float):
+        """Prepare chunk for overlapped speech detection
 
         Parameters
         ----------
-        collated_y : (batch_size, num_frames, num_speakers) tensor
-            One-hot-encoding of current chunk speaker activity:
-                * collated_y[b, f, s] = 1 if sth speaker is active at fth frame
-                * collated_y[b, f, s] = 0 otherwise.
+        file_id : int
+            File index
+        start_time : float
+            Chunk start time
+        duration : float
+            Chunk duration.
 
         Returns
         -------
-        y : (batch_size, num_frames, ) np.ndarray
-            y[b, f] = 1 if there is two or more active speakers at fth frame, 0 otherwise.
+        sample : dict
+            Dictionary containing the chunk data with the following keys:
+            - `X`: waveform
+            - `y`: target as a SlidingWindowFeature instance
+            - `meta`:
+                - `database`: database index
+                - `file`: file index
         """
 
-        return 1 * (torch.sum(collated_y, dim=2, keepdim=False) > 1)
+        file = self.get_file(file_id)
+
+        chunk = Segment(start_time, start_time + duration)
+
+        sample = dict()
+        sample["X"], _ = self.model.audio.crop(file, chunk, duration=duration)
+
+        # gather all annotations of current file
+        annotations = self.annotations[self.annotations["file_id"] == file_id]
+
+        # gather all annotations with non-empty intersection with current chunk
+        chunk_annotations = annotations[
+            (annotations["start"] < chunk.end) & (annotations["end"] > chunk.start)
+        ]
+
+        # discretize chunk annotations at model output resolution
+        start = np.maximum(chunk_annotations["start"], chunk.start) - chunk.start
+        start_idx = np.floor(start / self.model.example_output.frames.step).astype(int)
+        end = np.minimum(chunk_annotations["end"], chunk.end) - chunk.start
+        end_idx = np.ceil(end / self.model.example_output.frames.step).astype(int)
+
+        # frame-level targets
+        y = np.zeros((self.model.example_output.num_frames, 1), dtype=np.uint8)
+        for start, end in zip(start_idx, end_idx):
+            y[start:end, 0] += 1
+        y = 1 * (y > 1)
+
+        sample["y"] = SlidingWindowFeature(
+            y, self.model.example_output.frames, labels=["speech"]
+        )
+
+        metadata = self.metadata[file_id]
+        sample["meta"] = {key: metadata[key] for key in metadata.dtype.names}
+        sample["meta"]["file"] = file_id
+
+        return sample

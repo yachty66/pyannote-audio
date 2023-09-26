@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 import math
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Sequence, Union
 
 import torch
 import torch.nn.functional as F
@@ -30,10 +30,13 @@ from pyannote.database.protocol import (
     SpeakerDiarizationProtocol,
     SpeakerVerificationProtocol,
 )
-from torchmetrics import AUROC, Metric
+from torch.utils.data._utils.collate import default_collate
+from torchmetrics import Metric
+from torchmetrics.classification import BinaryAUROC
 from tqdm import tqdm
 
 from pyannote.audio.core.task import Problem, Resolution, Specifications
+from pyannote.audio.torchmetrics.classification import EqualErrorRate
 from pyannote.audio.utils.random import create_rng_for_worker
 
 
@@ -72,8 +75,7 @@ class SupervisedRepresentationLearningTaskMixin:
     def batch_size(self, batch_size: int):
         self.batch_size_ = batch_size
 
-    def setup(self, stage: Optional[str] = None):
-
+    def setup(self):
         # loop over the training set, remove annotated regions shorter than
         # chunk duration, and keep track of the reference annotations, per class.
 
@@ -81,9 +83,7 @@ class SupervisedRepresentationLearningTaskMixin:
 
         desc = f"Loading {self.protocol.name} training labels"
         for f in tqdm(iterable=self.protocol.train(), desc=desc, unit="file"):
-
             for klass in f["annotation"].labels():
-
                 # keep class's (long enough) speech turns...
                 speech_turns = [
                     segment
@@ -115,6 +115,7 @@ class SupervisedRepresentationLearningTaskMixin:
             problem=Problem.REPRESENTATION,
             resolution=Resolution.CHUNK,
             duration=self.duration,
+            min_duration=self.min_duration,
             classes=sorted(self._train),
         )
 
@@ -127,7 +128,10 @@ class SupervisedRepresentationLearningTaskMixin:
     def default_metric(
         self,
     ) -> Union[Metric, Sequence[Metric], Dict[str, Metric]]:
-        return AUROC(compute_on_step=False)
+        return [
+            EqualErrorRate(compute_on_cpu=True, distances=False),
+            BinaryAUROC(compute_on_cpu=True),
+        ]
 
     def train__iter__(self):
         """Iterate over training samples
@@ -145,11 +149,11 @@ class SupervisedRepresentationLearningTaskMixin:
 
         classes = list(self.specifications.classes)
 
+        # select batch-wise duration at random
         batch_duration = rng.uniform(self.min_duration, self.duration)
         num_samples = 0
 
         while True:
-
             # shuffle classes so that we don't always have the same
             # groups of classes in a batch (which might be especially
             # problematic for contrast-based losses like contrastive
@@ -157,13 +161,11 @@ class SupervisedRepresentationLearningTaskMixin:
             rng.shuffle(classes)
 
             for klass in classes:
-
                 # class index in original sorted order
                 y = self.specifications.classes.index(klass)
 
                 # multiple chunks per class
                 for _ in range(self.num_chunks_per_class):
-
                     # select one file at random (with probability proportional to its class duration)
                     file, *_ = rng.choices(
                         self._train[klass],
@@ -216,19 +218,36 @@ class SupervisedRepresentationLearningTaskMixin:
         avg_chunk_duration = 0.5 * (self.min_duration + self.duration)
         return max(self.batch_size, math.ceil(duration / avg_chunk_duration))
 
-    def training_step(self, batch, batch_idx: int):
+    def collate_fn(self, batch, stage="train"):
+        collated = default_collate(batch)
 
+        if stage == "train":
+            self.augmentation.train(mode=True)
+            augmented = self.augmentation(
+                samples=collated["X"],
+                sample_rate=self.model.hparams.sample_rate,
+            )
+            collated["X"] = augmented.samples
+
+        return collated
+
+    def training_step(self, batch, batch_idx: int):
         X, y = batch["X"], batch["y"]
         loss = self.model.loss_func(self.model(X), y)
 
+        # skip batch if something went wrong for some reason
+        if torch.isnan(loss):
+            return None
+
         self.model.log(
-            f"{self.logging_prefix}TrainLoss",
+            "loss/train",
             loss,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
         )
+
         return {"loss": loss}
 
     def val__getitem__(self, idx):
@@ -261,7 +280,6 @@ class SupervisedRepresentationLearningTaskMixin:
             pass
 
     def val__len__(self):
-
         if isinstance(self.protocol, SpeakerVerificationProtocol):
             return len(self._validation)
 
@@ -269,9 +287,7 @@ class SupervisedRepresentationLearningTaskMixin:
             return 0
 
     def validation_step(self, batch, batch_idx: int):
-
         if isinstance(self.protocol, SpeakerVerificationProtocol):
-
             with torch.no_grad():
                 emb1 = self.model(batch["X1"]).detach()
                 emb2 = self.model(batch["X2"]).detach()
@@ -287,6 +303,3 @@ class SupervisedRepresentationLearningTaskMixin:
                 prog_bar=True,
                 logger=True,
             )
-
-        elif isinstance(self.protocol, SpeakerDiarizationProtocol):
-            pass

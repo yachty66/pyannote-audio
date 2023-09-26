@@ -23,29 +23,23 @@
 
 from __future__ import annotations
 
-from functools import partial
-
-try:
-    from functools import cached_property
-except ImportError:
-    from backports.cached_property import cached_property
-
 import multiprocessing
 import sys
 import warnings
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property, partial
 from numbers import Number
-from typing import Dict, List, Optional, Sequence, Text, Tuple, Union
+from typing import Dict, List, Literal, Optional, Sequence, Text, Tuple, Union
 
 import pytorch_lightning as pl
+import scipy.special
 import torch
 from pyannote.database import Protocol
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from torch_audiomentations import Identity
 from torch_audiomentations.core.transforms_interface import BaseWaveformTransform
 from torchmetrics import Metric, MetricCollection
-from typing_extensions import Literal
 
 from pyannote.audio.utils.loss import binary_cross_entropy, nll_loss
 from pyannote.audio.utils.protocol import check_protocol
@@ -69,14 +63,20 @@ class Resolution(Enum):
     CHUNK = 2  # model outputs just one vector for the whole chunk
 
 
+class UnknownSpecificationsError(Exception):
+    pass
+
+
 @dataclass
 class Specifications:
     problem: Problem
     resolution: Resolution
 
-    # chunk duration in seconds.
-    # use None for variable-length chunks
-    duration: Optional[float] = None
+    # (maximum) chunk duration in seconds
+    duration: float
+
+    # (for variable-duration tasks only) minimum chunk duration in seconds
+    min_duration: Optional[float] = None
 
     # use that many seconds on the left- and rightmost parts of each chunk
     # to warm up the model. This is mostly useful for segmentation tasks.
@@ -89,8 +89,42 @@ class Specifications:
     # (for classification tasks only) list of classes
     classes: Optional[List[Text]] = None
 
+    # (for powerset only) max number of simultaneous classes
+    # (n choose k with k <= powerset_max_classes)
+    powerset_max_classes: Optional[int] = None
+
     # whether classes are permutation-invariant (e.g. diarization)
     permutation_invariant: bool = False
+
+    @cached_property
+    def powerset(self) -> bool:
+        if self.powerset_max_classes is None:
+            return False
+
+        if self.problem != Problem.MONO_LABEL_CLASSIFICATION:
+            raise ValueError(
+                "`powerset_max_classes` only makes sense with multi-class classification problems."
+            )
+
+        return True
+
+    @cached_property
+    def num_powerset_classes(self) -> int:
+        # compute number of subsets of size at most "powerset_max_classes"
+        # e.g. with len(classes) = 3 and powerset_max_classes = 2:
+        # {}, {0}, {1}, {2}, {0, 1}, {0, 2}, {1, 2}
+        return int(
+            sum(
+                scipy.special.binom(len(self.classes), i)
+                for i in range(0, self.powerset_max_classes + 1)
+            )
+        )
+
+    def __len__(self):
+        return 1
+
+    def __iter__(self):
+        yield self
 
 
 class TrainDataset(IterableDataset):
@@ -165,7 +199,7 @@ class Task(pl.LightningDataModule):
 
     Attributes
     ----------
-    specifications : Specifications or dict of Specifications
+    specifications : Specifications or tuple of Specifications
         Task specifications (available after `Task.setup` has been called.)
     """
 
@@ -184,7 +218,10 @@ class Task(pl.LightningDataModule):
         super().__init__()
 
         # dataset
-        self.protocol, self.has_validation = check_protocol(protocol)
+        self.protocol, checks = check_protocol(protocol)
+        self.has_validation = checks["has_validation"]
+        self.has_scope = checks["has_scope"]
+        self.has_classes = checks["has_classes"]
 
         # batching
         self.duration = duration
@@ -231,7 +268,28 @@ class Task(pl.LightningDataModule):
         """
         pass
 
-    def setup(self, stage: Optional[str] = None):
+    @property
+    def specifications(self) -> Union[Specifications, Tuple[Specifications]]:
+        # setup metadata on-demand the first time specifications are requested and missing
+        if not hasattr(self, "_specifications"):
+            self.setup_metadata()
+        return self._specifications
+
+    @specifications.setter
+    def specifications(
+        self, specifications: Union[Specifications, Tuple[Specifications]]
+    ):
+        self._specifications = specifications
+
+    @property
+    def has_setup_metadata(self):
+        return getattr(self, "_has_setup_metadata", False)
+
+    @has_setup_metadata.setter
+    def has_setup_metadata(self, value: bool):
+        self._has_setup_metadata = value
+
+    def setup_metadata(self):
         """Called at the beginning of training at the very beginning of Model.setup(stage="fit")
 
         Notes
@@ -241,7 +299,10 @@ class Task(pl.LightningDataModule):
         If `specifications` attribute has not been set in `__init__`,
         `setup` is your last chance to set it.
         """
-        pass
+
+        if not self.has_setup_metadata:
+            self.setup()
+            self.has_setup_metadata = True
 
     def setup_loss_func(self):
         pass
@@ -269,18 +330,6 @@ class Task(pl.LightningDataModule):
             drop_last=True,
             collate_fn=partial(self.collate_fn, stage="train"),
         )
-
-    @cached_property
-    def logging_prefix(self):
-
-        prefix = f"{self.__class__.__name__}-"
-        if hasattr(self.protocol, "name"):
-            # "." has a special meaning for pytorch-lightning checkpointing
-            # so we remove dots from protocol names
-            name_without_dots = "".join(self.protocol.name.split("."))
-            prefix += f"{name_without_dots}-"
-
-        return prefix
 
     def default_loss(
         self, specifications: Specifications, target, prediction, weight=None
@@ -314,7 +363,7 @@ class Task(pl.LightningDataModule):
         ]:
             return binary_cross_entropy(prediction, target, weight=weight)
 
-        elif specifications.problem == Problem.MONO_LABEL_CLASSIFICATION:
+        elif specifications.problem in [Problem.MONO_LABEL_CLASSIFICATION]:
             return nll_loss(prediction, target, weight=weight)
 
         else:
@@ -345,6 +394,11 @@ class Task(pl.LightningDataModule):
             {"loss": loss}
         """
 
+        if isinstance(self.specifications, tuple):
+            raise NotImplementedError(
+                "Default training/validation step is not implemented for multi-task."
+            )
+
         # forward pass
         y_pred = self.model(batch["X"])
 
@@ -370,12 +424,17 @@ class Task(pl.LightningDataModule):
 
         # compute loss
         loss = self.default_loss(self.specifications, y, y_pred, weight=weight)
+
+        # skip batch if something went wrong for some reason
+        if torch.isnan(loss):
+            return None
+
         self.model.log(
-            f"{self.logging_prefix}{stage.capitalize()}Loss",
+            f"loss/{stage}",
             loss,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
             logger=True,
         )
         return {"loss": loss}
@@ -413,9 +472,6 @@ class Task(pl.LightningDataModule):
     def validation_step(self, batch, batch_idx: int):
         return self.common_step(batch, batch_idx, "val")
 
-    def validation_epoch_end(self, outputs):
-        pass
-
     def default_metric(self) -> Union[Metric, Sequence[Metric], Dict[str, Metric]]:
         """Default validation metric"""
         msg = f"Missing '{self.__class__.__name__}.default_metric' method."
@@ -426,7 +482,7 @@ class Task(pl.LightningDataModule):
         if self._metric is None:
             self._metric = self.default_metric()
 
-        return MetricCollection(self._metric, prefix=self.logging_prefix)
+        return MetricCollection(self._metric)
 
     def setup_validation_metric(self):
         metric = self.metric

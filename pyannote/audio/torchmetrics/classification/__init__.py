@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2021 CNRS
+# Copyright (c) 2023- CNRS
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,24 +21,8 @@
 # SOFTWARE.
 
 
-from typing import Text
+from .equal_error_rate import EqualErrorRate
 
-from tqdm import tqdm
-
-
-class InferenceProgressHook:
-    """Default inference progress bar"""
-
-    def __init__(self, desc: Text = None):
-        self.desc = desc
-
-    def __call__(self, chunk_idx, num_chunks):
-
-        if chunk_idx == 0:
-            self.pbar = tqdm(desc=self.desc, total=num_chunks, unit="chunks")
-            self.chunk_idx = chunk_idx
-
-        self.pbar.update(chunk_idx - self.chunk_idx)
-        self.chunk_idx = chunk_idx
-        if self.chunk_idx == num_chunks:
-            self.pbar.close()
+__all__ = [
+    "EqualErrorRate",
+]
