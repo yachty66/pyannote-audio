@@ -80,17 +80,17 @@ for turn, _, speaker in diarization.itertracks(yield_label=True):
 Out of the box, `pyannote.audio` speaker diarization [pipeline](https://hf.co/pyannote/speaker-diarization-3.1) v3.1 is expected to be much better (and faster) than v2.x.  
 Those numbers are diarization error rates (in %):
 
-| Dataset \ Version      | v1.1 | v2.0 | [v2.1](https://hf.co/pyannote/speaker-diarization-2.1) | [v3.1](https://hf.co/pyannote/speaker-diarization-3.1) |  <a href="mailto:herve-at-niderb-dot-fr?subject=Premium pyannote.audio pipeline&body=Looks like I got your attention! Drop me an email for more details. Hervé.">Premium</a>  |
-| ---------------------- | ---- | ---- | ------ | ------ | --------- |
-| AISHELL-4              | -    | 14.6 |  14.1  |  12.2  | 12.3      |
-| AliMeeting (channel 1) | -    | -    |  27.4  |  24.4  | 19.4      |
-| AMI (IHM)              | 29.7 | 18.2 |  18.9  |  18.8  | 16.7      |
-| AMI (SDM)              | -    | 29.0 |  27.1  |  22.4  | 20.1      |
-| AVA-AVD                | -    | -    |  -     |  50.0  | 42.7      |
-| DIHARD 3 (full)        | 29.2 | 21.0 |  26.9  |  21.7  | 17.0      |
-| MSDWild                | -    | -    |  -     |  25.3  | 20.4      |
-| REPERE (phase2)        | -    | 12.6 |   8.2  |   7.8  |  7.8      |
-| VoxConverse (v0.3)     | 21.5 | 12.6 |  11.2  |  11.3  |  9.5      |
+| Dataset \ Version      | v1.1 | [v2.1](https://hf.co/pyannote/speaker-diarization-2.1) | [v3.1](https://hf.co/pyannote/speaker-diarization-3.1) |  <a href="mailto:herve-at-niderb-dot-fr?subject=Premium pyannote.audio pipeline&body=Looks like I got your attention! Drop me an email for more details. Hervé.">Premium</a>  |
+| ---------------------- | ---- | ----- | ------ | --------- |
+| AISHELL-4              | -    | 14.1  |  12.2  | 12.3      |
+| AliMeeting (channel 1) | -    | 27.4  |  24.4  | 19.4      |
+| AMI (IHM)              | 29.7 | 18.9  |  18.8  | 16.7      |
+| AMI (SDM)              | -    | 27.1  |  22.4  | 20.1      |
+| AVA-AVD                | -    |  -    |  50.0  | 42.7      |
+| DIHARD 3 (full)        | 29.2 | 26.9  |  21.7  | 17.0      |
+| MSDWild                | -    |  -    |  25.3  | 20.4      |
+| REPERE (phase2)        | -    |  8.2  |   7.8  |  7.8      |
+| VoxConverse (v0.3)     | 21.5 | 11.2  |  11.3  |  9.5      |
 
 ## Citations
 
