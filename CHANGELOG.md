@@ -2,6 +2,12 @@
 
 ## `develop` branch
 
+## Version 3.1.0 (2023-11-16)
+
+### TL;DR
+
+[`pyannote/speaker-diarization-3.1`](https://hf.co/pyannote/speaker-diarization-3.1) no longer requires [unpopular](https://github.com/pyannote/pyannote-audio/issues/1537) ONNX runtime
+
 ### New features
 
 - feat(model): add WeSpeaker embedding wrapper based on PyTorch
@@ -27,7 +33,7 @@
 - BREAKING(setup): remove `onnxruntime` dependency.
   You can still use ONNX `hbredin/wespeaker-voxceleb-resnet34-LM` but you will have to install `onnxruntime` yourself.
 - BREAKING(pipeline): remove `logging_hook` (use `ArtifactHook` instead)
-- BREAKING(pipeline): remove `onset` and `offset` parameter in `SpeakerDiarizationMixin.speaker_count`  
+- BREAKING(pipeline): remove `onset` and `offset` parameter in `SpeakerDiarizationMixin.speaker_count`
   You should now binarize segmentations before passing them to `speaker_count`
 
 ## Version 3.0.1 (2023-09-28)
