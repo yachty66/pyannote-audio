@@ -1,6 +1,6 @@
 # Changelog
 
-## `develop` branch
+## Version 3.1.1 (2023-12-01)
 
 ### TL;DR
 
