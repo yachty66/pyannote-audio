@@ -45,13 +45,13 @@ class VoiceActivityDetection(SegmentationTask):
     ----------
     protocol : Protocol
         pyannote.database protocol
-   cache : str, optional
+    cache : str, optional
         As (meta-)data preparation might take a very long time for large datasets,
-        it can be cached to disk for later (and faster!) re-use. 
+        it can be cached to disk for later (and faster!) re-use.
         When `cache` does not exist, `Task.prepare_data()` generates training
         and validation metadata from `protocol` and save them to disk.
         When `cache` exists, `Task.prepare_data()` is skipped and (meta)-data
-        are loaded from disk. Defaults to a temporary path. 
+        are loaded from disk. Defaults to a temporary path.
     duration : float, optional
         Chunks duration. Defaults to 2s.
     warm_up : float or (float, float), optional
@@ -89,12 +89,12 @@ class VoiceActivityDetection(SegmentationTask):
         cache: Optional[Union[str, None]] = None,
         duration: float = 2.0,
         warm_up: Union[float, Tuple[float, float]] = 0.0,
-        balance: Sequence[Text] = None,
-        weight: Text = None,
+        balance: Optional[Sequence[Text]] = None,
+        weight: Optional[Text] = None,
         batch_size: int = 32,
-        num_workers: int = None,
+        num_workers: Optional[int] = None,
         pin_memory: bool = False,
-        augmentation: BaseWaveformTransform = None,
+        augmentation: Optional[BaseWaveformTransform] = None,
         metric: Union[Metric, Sequence[Metric], Dict[str, Metric]] = None,
     ):
         super().__init__(
