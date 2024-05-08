@@ -1,6 +1,6 @@
 # Changelog
 
-## develop
+## Version 3.2.0 (2024-05-08)
 
 ### New features
 
