@@ -16,6 +16,7 @@
 
 - fix(task): fix random generators and their reproducibility (with [@FrenchKrab](https://github.com/FrenchKrab))
 - fix(task): fix estimation of training set size (with [@FrenchKrab](https://github.com/FrenchKrab))
+- fix(hook): fix `torch.Tensor` support in `ArtifactHook`
 
 ### Improvements
 
