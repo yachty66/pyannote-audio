@@ -17,6 +17,7 @@
 - fix(task): fix random generators and their reproducibility (with [@FrenchKrab](https://github.com/FrenchKrab))
 - fix(task): fix estimation of training set size (with [@FrenchKrab](https://github.com/FrenchKrab))
 - fix(hook): fix `torch.Tensor` support in `ArtifactHook`
+- fix(doc): fix typo in `Powerset` docstring (with [@lukasstorck](https://github.com/lukasstorck))
 
 ### Improvements
 
@@ -29,6 +30,10 @@
 
 - BREAKING(model): get rid of `Model.example_output` in favor of `num_frames` method, `receptive_field` property, and `dimension` property
 - BREAKING(task): custom tasks need to be updated (see "Add your own task" tutorial)
+
+## Community contributions
+
+- community: add tutorial for offline use of `pyannote/speaker-diarization-3.1` (by [@simonottenhauskenbun](https://github.com/simonottenhauskenbun))
 
 ## Version 3.1.1 (2023-12-01)
 
