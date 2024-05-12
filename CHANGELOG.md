@@ -26,12 +26,12 @@
 - improve(io): switch to `torchaudio >= 2.2.0`
 - improve(doc): update tutorials (with [@clement-pages](https://github.com/clement-pages/))
 
-## Breaking changes
+### Breaking changes
 
 - BREAKING(model): get rid of `Model.example_output` in favor of `num_frames` method, `receptive_field` property, and `dimension` property
 - BREAKING(task): custom tasks need to be updated (see "Add your own task" tutorial)
 
-## Community contributions
+### Community contributions
 
 - community: add tutorial for offline use of `pyannote/speaker-diarization-3.1` (by [@simonottenhauskenbun](https://github.com/simonottenhauskenbun))
 
