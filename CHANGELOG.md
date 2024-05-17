@@ -32,6 +32,7 @@
 - fix(task): fix estimation of training set size (with [@FrenchKrab](https://github.com/FrenchKrab))
 - fix(hook): fix `torch.Tensor` support in `ArtifactHook`
 - fix(doc): fix typo in `Powerset` docstring (with [@lukasstorck](https://github.com/lukasstorck))
+- fix(doc): remove mention of unsupported `numpy.ndarray` waveform (with [@Purfview](https://github.com/Purfview))
 
 ### Improvements
 
