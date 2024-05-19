@@ -13,6 +13,7 @@
 ### Improvements
 
 - improve(io): when available, default to using `soundfile` backend
+- improve(pipeline): do not extract embeddings when `max_speakers` is set to 1
 
 ## Version 3.2.0 (2024-05-08)
 
