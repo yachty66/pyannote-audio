@@ -1,5 +1,33 @@
 # Changelog
 
+## Version 3.3.0 (2024-06-14)
+
+### TL;DR
+
+`pyannote.audio` does [speech separation](https://hf.co/pyannote/speech-separation-ami-1.0): multi-speaker audio in, one audio channel per speaker out!
+
+```bash
+pip install pyannote.audio[separation]==3.3.0
+```
+
+### New features
+
+- feat(task): add `PixIT` joint speaker diarization and speech separation task (with [@joonaskalda](https://github.com/joonaskalda/))
+- feat(model): add `ToTaToNet` joint speaker diarization and speech separation model (with [@joonaskalda](https://github.com/joonaskalda/))
+- feat(pipeline): add `SpeechSeparation` pipeline (with [@joonaskalda](https://github.com/joonaskalda/))
+- feat(io): add option to select torchaudio `backend`
+
+### Fixes
+
+- fix(task): fix wrong train/development split when training with (some) meta-protocols ([#1709](https://github.com/pyannote/pyannote-audio/issues/1709))
+- fix(task): fix metadata preparation with missing validation subset ([@clement-pages](https://github.com/clement-pages/))
+
+### Improvements
+
+- improve(io): when available, default to using `soundfile` backend
+- improve(pipeline): do not extract embeddings when `max_speakers` is set to 1
+- improve(pipeline): optimize memory usage of most pipelines ([#1713](https://github.com/pyannote/pyannote-audio/pull/1713) by [@benniekiss](https://github.com/benniekiss/))
+
 ## Version 3.2.0 (2024-05-08)
 
 ### New features
@@ -18,6 +46,7 @@
 - fix(task): fix estimation of training set size (with [@FrenchKrab](https://github.com/FrenchKrab))
 - fix(hook): fix `torch.Tensor` support in `ArtifactHook`
 - fix(doc): fix typo in `Powerset` docstring (with [@lukasstorck](https://github.com/lukasstorck))
+- fix(doc): remove mention of unsupported `numpy.ndarray` waveform (with [@Purfview](https://github.com/Purfview))
 
 ### Improvements
 
@@ -26,12 +55,12 @@
 - improve(io): switch to `torchaudio >= 2.2.0`
 - improve(doc): update tutorials (with [@clement-pages](https://github.com/clement-pages/))
 
-## Breaking changes
+### Breaking changes
 
 - BREAKING(model): get rid of `Model.example_output` in favor of `num_frames` method, `receptive_field` property, and `dimension` property
 - BREAKING(task): custom tasks need to be updated (see "Add your own task" tutorial)
 
-## Community contributions
+### Community contributions
 
 - community: add tutorial for offline use of `pyannote/speaker-diarization-3.1` (by [@simonottenhauskenbun](https://github.com/simonottenhauskenbun))
 

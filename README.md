@@ -1,5 +1,5 @@
-Using `pyannote.audio` open-source toolkit in production?
-Make the most of it thanks to our [consulting services](https://herve.niderb.fr/consulting.html).
+Using `pyannote.audio` open-source toolkit in production?  
+Consider switching to [pyannoteAI](https://www.pyannote.ai) for better and faster options.
 
 # `pyannote.audio` speaker diarization toolkit
 
@@ -79,7 +79,7 @@ for turn, _, speaker in diarization.itertracks(yield_label=True):
 Out of the box, `pyannote.audio` speaker diarization [pipeline](https://hf.co/pyannote/speaker-diarization-3.1) v3.1 is expected to be much better (and faster) than v2.x.
 Those numbers are diarization error rates (in %):
 
-| Benchmark                                                                                                                   | [v2.1](https://hf.co/pyannote/speaker-diarization-2.1) | [v3.1](https://hf.co/pyannote/speaker-diarization-3.1) | [Premium](https://forms.office.com/e/GdqwVgkZ5C) |
+| Benchmark                                                                                                                   | [v2.1](https://hf.co/pyannote/speaker-diarization-2.1) | [v3.1](https://hf.co/pyannote/speaker-diarization-3.1) | [pyannoteAI](https://www.pyannote.ai) |
 | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------ |
 | [AISHELL-4](https://arxiv.org/abs/2104.03603)                                                                               | 14.1                                                   | 12.2                                                   | 11.9                                             |
 | [AliMeeting](https://www.openslr.org/119/) (channel 1)                                                                      | 27.4                                                   | 24.4                                                   | 22.5                                             |
