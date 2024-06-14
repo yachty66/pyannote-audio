@@ -1,6 +1,6 @@
 # Changelog
 
-## develop
+## Version 3.3.0 (2024-06-14)
 
 ### TL;DR
 
