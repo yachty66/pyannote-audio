@@ -1,15 +1,17 @@
 # Changelog
 
-## develop
+
+## Version 3.3.1 (2024-06-19)
+
+### Breaking changes
+
+- setup: drop support for Python 3.8
 
 ### Fixes
 
 - fix: fix support for `numpy==2.x` ([@ibevers](https://github.com/ibevers/))
 - fix: fix support for `speechbrain==1.x` ([@Adel-Moumen](https://github.com/Adel-Moumen/))
 
-### Breaking changes
-
-- setup: drop support for Python 3.8
 
 ## Version 3.3.0 (2024-06-14)
 
