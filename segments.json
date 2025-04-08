@@ -4,111 +4,127 @@
     "end": 0.4697187500000001,
     "speaker": "SPEAKER_03",
     "audio_file": "speaker_segments/segment_000_0.42_0.47.wav",
-    "segment_id": 0
+    "segment_id": 0,
+    "is_overlapping": false
   },
   {
     "start": 0.4697187500000001,
     "end": 2.95034375,
     "speaker": "SPEAKER_00",
     "audio_file": "speaker_segments/segment_001_0.47_2.95.wav",
-    "segment_id": 1
+    "segment_id": 1,
+    "is_overlapping": false
   },
   {
     "start": 3.10221875,
     "end": 3.4397187500000004,
     "speaker": "SPEAKER_03",
     "audio_file": "speaker_segments/segment_002_3.10_3.44.wav",
-    "segment_id": 2
+    "segment_id": 2,
+    "is_overlapping": false
   },
   {
     "start": 3.87846875,
     "end": 6.257843750000001,
     "speaker": "SPEAKER_03",
     "audio_file": "speaker_segments/segment_003_3.88_6.26.wav",
-    "segment_id": 3
+    "segment_id": 3,
+    "is_overlapping": false
   },
   {
     "start": 6.257843750000001,
     "end": 6.2915937500000005,
     "speaker": "SPEAKER_00",
     "audio_file": "speaker_segments/segment_004_6.26_6.29.wav",
-    "segment_id": 4
+    "segment_id": 4,
+    "is_overlapping": false
   },
   {
     "start": 6.2915937500000005,
     "end": 6.61221875,
     "speaker": "SPEAKER_03",
     "audio_file": "speaker_segments/segment_005_6.29_6.61.wav",
-    "segment_id": 5
+    "segment_id": 5,
+    "is_overlapping": false
   },
   {
     "start": 6.3590937499999995,
     "end": 9.19409375,
     "speaker": "SPEAKER_00",
     "audio_file": "speaker_segments/segment_006_6.36_9.19.wav",
-    "segment_id": 6
+    "segment_id": 6,
+    "is_overlapping": false
   },
   {
     "start": 6.61221875,
     "end": 7.844093750000001,
     "speaker": "SPEAKER_04",
     "audio_file": "speaker_segments/segment_007_6.61_7.84.wav",
-    "segment_id": 7
+    "segment_id": 7,
+    "is_overlapping": false
   },
   {
     "start": 9.649718750000002,
     "end": 9.66659375,
     "speaker": "SPEAKER_03",
     "audio_file": "speaker_segments/segment_008_9.65_9.67.wav",
-    "segment_id": 8
+    "segment_id": 8,
+    "is_overlapping": false
   },
   {
     "start": 9.66659375,
     "end": 12.400343750000001,
     "speaker": "SPEAKER_04",
     "audio_file": "speaker_segments/segment_009_9.67_12.40.wav",
-    "segment_id": 9
+    "segment_id": 9,
+    "is_overlapping": false
   },
   {
     "start": 13.058468750000003,
     "end": 19.032218750000002,
     "speaker": "SPEAKER_04",
     "audio_file": "speaker_segments/segment_010_13.06_19.03.wav",
-    "segment_id": 10
+    "segment_id": 10,
+    "is_overlapping": false
   },
   {
     "start": 17.36159375,
     "end": 17.395343750000002,
     "speaker": "SPEAKER_02",
     "audio_file": "speaker_segments/segment_011_17.36_17.40.wav",
-    "segment_id": 11
+    "segment_id": 11,
+    "is_overlapping": false
   },
   {
     "start": 17.395343750000002,
     "end": 17.68221875,
     "speaker": "SPEAKER_01",
     "audio_file": "speaker_segments/segment_012_17.40_17.68.wav",
-    "segment_id": 12
+    "segment_id": 12,
+    "is_overlapping": false
   },
   {
     "start": 17.68221875,
     "end": 17.69909375,
     "speaker": "SPEAKER_02",
     "audio_file": "speaker_segments/segment_013_17.68_17.70.wav",
-    "segment_id": 13
+    "segment_id": 13,
+    "is_overlapping": false
   },
   {
     "start": 19.032218750000002,
     "end": 19.06596875,
     "speaker": "SPEAKER_02",
     "audio_file": "speaker_segments/segment_014_19.03_19.07.wav",
-    "segment_id": 14
+    "segment_id": 14,
+    "is_overlapping": false
   },
   {
     "start": 19.06596875,
     "end": 27.992843750000002,
     "speaker": "SPEAKER_01",
     "audio_file": "speaker_segments/segment_015_19.07_27.99.wav",
-    "segment_id": 15
+    "segment_id": 15,
+    "is_overlapping": false
   }
 ]
